@@ -1,7 +1,7 @@
 import streamlit as st
 import os
-from anthropic import Anthropic
-from content_filter import ContentFilter  # Import our new filter module
+from openai import OpenAI
+from content_filter import ContentFilter
 
 # Page configuration
 st.set_page_config(page_title="Murder Mystery Assistant", page_icon="🔍")
@@ -21,9 +21,9 @@ except FileNotFoundError:
     and a satisfying resolution. Create memorable characters and an atmospheric setting.
     """
 
-# Initialize Anthropic client
-def get_anthropic_client():
-    return Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+# Initialize OpenAI client
+def get_openai_client():
+    return OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # Initialize session state for chat history
 if "messages" not in st.session_state:
@@ -68,28 +68,29 @@ if prompt := st.chat_input("Ask about creating your murder mystery..."):
             message_placeholder.write(result)
             st.session_state.messages.append({"role": "assistant", "content": result})
         else:
-            # Format messages for Anthropic
+            # Format messages for OpenAI
             messages_for_api = []
             
-            # Add conversation history (excluding system message)
+            # Add system message first for OpenAI
+            messages_for_api.append({"role": "system", "content": st.session_state.system_prompt})
+            
+            # Add conversation history
             for msg in st.session_state.messages:
-                if msg["role"] == "user":
-                    messages_for_api.append({"role": "user", "content": msg["content"]})
-                elif msg["role"] == "assistant":
-                    messages_for_api.append({"role": "assistant", "content": msg["content"]})
+                # Skip the system prompt from history (it's already added above)
+                if msg.get("role") != "system":
+                    messages_for_api.append({"role": msg["role"], "content": msg["content"]})
             
             try:
-                # Get response from Anthropic
-                client = get_anthropic_client()
-                response = client.messages.create(
-                    model="claude-3-7-sonnet-20250219",
-                    system=st.session_state.system_prompt,  # System prompt goes here as a parameter
+                # Get response from OpenAI
+                client = get_openai_client()
+                response = client.chat.completions.create(
+                    model="gpt-4",  # or "gpt-3.5-turbo" for cheaper option
                     messages=messages_for_api,
                     temperature=0.7,
                     max_tokens=1000
                 )
                 
-                result = response.content[0].text
+                result = response.choices[0].message.content
                 
                 # Display the response
                 message_placeholder.write(result)
